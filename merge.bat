@@ -1,0 +1,2 @@
+esptool.py --chip esp32 merge_bin -o build/mergedflash.bin --flash_mode dio --flash_size 4MB --flash_freq 40m 0x1000 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/Oradio.bin
+qemu-system-xtensa -s -S -nographic -machine esp32 -smp cpus=2 -drive file=build/mergedflash.bin,format=raw

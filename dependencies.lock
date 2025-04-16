@@ -1,0 +1,29 @@
+dependencies:
+  bblanchon/arduinojson:
+    component_hash: 21b41e6cce335cefc142c457ceb50eb45621ff9ea6fd0a0ee349a642e48a47a3
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 7.3.0
+  idf:
+    source:
+      type: idf
+    version: 5.4.0
+  joltwallet/littlefs:
+    component_hash: add3caf39a265868f70e55f17e8bfb401f200e45a601dc392832e7ac2c1487bc
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.3'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.16.4
+direct_dependencies:
+- bblanchon/arduinojson
+- idf
+- joltwallet/littlefs
+manifest_hash: d169f5d35591ac201ee427c8510f39537b2dcb9fdb34f6e4cfc79d95dac60b93
+target: esp32
+version: 2.0.0

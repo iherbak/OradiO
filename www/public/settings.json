@@ -1,0 +1,24 @@
+{
+    "display": {
+        "sdapin": 21,
+        "sclpin": 22,
+        "rows": 2,
+        "cols": 16
+    },
+    "vs1053": {
+        "dreqpin": 27,
+        "xcspin": 25,
+        "xdcspin": 16,
+        "resetpin": -1,
+        "mosipin": 23,
+        "misopin": 19,
+        "sclkpin": 18
+    },
+    "wifi":{
+        "stassid":"",
+        "stapassword":"",
+        "apssid":"oradio",
+        "appassword":"oradio777",
+        "startasap":true
+    }
+}
