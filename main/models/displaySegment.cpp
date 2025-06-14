@@ -1,24 +1,26 @@
 #include "displaySegment.h"
 
-DisplaySegment::DisplaySegment(int segmentId, int startColumn, int startRow, int endColumn, int endRow)
+DisplaySegment::DisplaySegment(int segmentId, int layer, int startColumn, int startRow, int endColumn, int endRow)
 {
     id = segmentId;
+    layerNumber = layer;
     bounds.startRow = startRow;
     bounds.startColumn = startColumn;
     bounds.endColumn = endColumn;
     bounds.endRow = endRow;
-};
-
-DisplaySegment::DisplaySegment(int segmentId, Bounds bounds) : DisplaySegment(segmentId, bounds.startColumn, bounds.startRow, bounds.endColumn, bounds.endRow)
-{
     _content = "";
     scrollData.isScrolling = 0;
     scrollData.scrollPosition = -1;
-}
+};
+
+DisplaySegment::DisplaySegment(int segmentId, int layer, Bounds bounds) : DisplaySegment(segmentId, layer, bounds.startColumn, bounds.startRow, bounds.endColumn, bounds.endRow) {
+};
+
 std::string DisplaySegment::GetContent()
 {
     return _content;
-}
+};
+
 void DisplaySegment::SetContent(std::string &content)
 {
     if (_content != content)

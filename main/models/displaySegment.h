@@ -11,11 +11,12 @@ struct DisplaySegment
 {
 public:
     DisplaySegment() {};
-    DisplaySegment(int segmentId, int startColumn, int startRow, int endColumn, int endRow);
-    DisplaySegment(int segmentId, Bounds bounds);
+    DisplaySegment(int segmentId, int layerNumber, int startColumn, int startRow, int endColumn, int endRow);
+    DisplaySegment(int segmentId, int layerNumber, Bounds bounds);
     void SetContent(std::string &content);
     std::string GetContent();
     int id;
+    int layerNumber;
     ScrollData scrollData;
     Bounds bounds;
 

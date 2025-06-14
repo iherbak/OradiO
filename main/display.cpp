@@ -14,45 +14,49 @@ esp_err_t Display::layoutCheck(DisplaySegment segment)
     auto bounds = segment.bounds;
     for (auto itr = _layout.begin(); itr != _layout.end(); itr++)
     {
-        auto usedBounds = itr->second.bounds;
+        // only check collosion between same layer segments
+        if (itr->second.layerNumber == segment.layerNumber)
+        {
+            auto usedBounds = itr->second.bounds;
 
-        // rowcheck
-        if ((usedBounds.startRow <= bounds.startRow) && (usedBounds.endRow >= bounds.startRow))
-        {
-            // column start check
-            if ((usedBounds.startColumn <= bounds.startColumn) && (usedBounds.endColumn >= bounds.startColumn))
+            // rowcheck
+            if ((usedBounds.startRow <= bounds.startRow) && (usedBounds.endRow >= bounds.startRow))
             {
-                printf("here 1");
-                return ESP_ERR_INVALID_SIZE;
+                // column start check
+                if ((usedBounds.startColumn <= bounds.startColumn) && (usedBounds.endColumn >= bounds.startColumn))
+                {
+                    printf("here 1");
+                    return ESP_ERR_INVALID_SIZE;
+                }
+                // column end check
+                if ((usedBounds.startColumn <= bounds.endColumn) && (usedBounds.endColumn >= bounds.endColumn))
+                {
+                    printf("here 2");
+                    return ESP_ERR_INVALID_SIZE;
+                }
             }
-            // column end check
-            if ((usedBounds.startColumn <= bounds.endColumn) && (usedBounds.endColumn >= bounds.endColumn))
+            // rowcheck
+            if ((usedBounds.startRow <= bounds.endRow) && (usedBounds.endRow >= bounds.endRow))
             {
-                printf("here 2");
-                return ESP_ERR_INVALID_SIZE;
-            }
-        }
-        // rowcheck
-        if ((usedBounds.startRow <= bounds.endRow) && (usedBounds.endRow >= bounds.endRow))
-        {
-            // columncheck
-            if ((usedBounds.startColumn <= bounds.startColumn) && (usedBounds.endColumn >= bounds.startColumn))
-            {
-                printf("here 3");
-                return ESP_ERR_INVALID_SIZE;
-            }
+                // columncheck
+                if ((usedBounds.startColumn <= bounds.startColumn) && (usedBounds.endColumn >= bounds.startColumn))
+                {
+                    printf("here 3");
+                    return ESP_ERR_INVALID_SIZE;
+                }
 
-            if ((usedBounds.startColumn <= bounds.endColumn) && (usedBounds.endColumn >= bounds.endColumn))
+                if ((usedBounds.startColumn <= bounds.endColumn) && (usedBounds.endColumn >= bounds.endColumn))
+                {
+                    printf("here 4");
+                    return ESP_ERR_INVALID_SIZE;
+                }
+            }
+            // bigger check
+            if ((usedBounds.startRow >= bounds.startRow) && (usedBounds.endRow <= bounds.endRow) && (usedBounds.startColumn >= bounds.startColumn) && (usedBounds.endColumn >= bounds.endColumn))
             {
-                printf("here 4");
+                printf("here 5");
                 return ESP_ERR_INVALID_SIZE;
             }
-        }
-        // bigger check
-        if ((usedBounds.startRow >= bounds.startRow) && (usedBounds.endRow <= bounds.endRow) && (usedBounds.startColumn >= bounds.startColumn) && (usedBounds.endColumn >= bounds.endColumn))
-        {
-            printf("here 5");
-            return ESP_ERR_INVALID_SIZE;
         }
     }
     return ESP_OK;
@@ -63,6 +67,7 @@ Display::Display(gpio_num_t sda, gpio_num_t scl, uint8_t rows, uint8_t cols)
     _lcd = new Lcd44780(0x27, sda, scl);
     ESP_ERROR_CHECK(_lcd->initIn4bitMode(rows, cols));
     _displayQueue = xQueueCreate(10, sizeof(DisplayMessage));
+    _activelayer = 0;
 };
 
 esp_err_t Display::AddSegment(DisplaySegment segment)
@@ -83,6 +88,11 @@ esp_err_t Display::AddSegment(DisplaySegment segment)
     return ESP_OK;
 };
 
+DisplaySegment Display::GetSegment(int segmentId)
+{
+    return _layout[segmentId];
+}
+
 esp_err_t Display::ProcessContents()
 {
     std::string s("");
@@ -92,6 +102,11 @@ esp_err_t Display::ProcessContents()
         // ESP_LOGD("Display", "Looking for segment %d", message.targetSegment);
         auto targetSegment = _layout.find(message.targetSegment);
         Bounds b = targetSegment->second.bounds;
+        if (targetSegment->second.layerNumber != _activelayer)
+        {
+            _activelayer = targetSegment->second.layerNumber;
+            _nonDefaultLayerTTL = 10;
+        }
         // ESP_LOGI("Display", "Segment found for message %s", message.content);
         std::string content(convertUsingCustomChars(message.content, false));
         if (targetSegment->second.GetContent() != content)
@@ -100,8 +115,12 @@ esp_err_t Display::ProcessContents()
             if (!targetSegment->second.scrollData.isScrolling)
             {
                 ESP_LOGD("Display", "Text is short, setting segment %d to non scrolling", message.targetSegment);
-                _lcd->moveCursor(b.startRow, b.startColumn);
-                _lcd->write(targetSegment->second.GetContent());
+                // write to screen only if segments layer is active
+                if (targetSegment->second.layerNumber == _activelayer)
+                {
+                    _lcd->moveCursor(b.startRow, b.startColumn);
+                    _lcd->write(targetSegment->second.GetContent());
+                }
             }
         }
     }
@@ -110,9 +129,9 @@ esp_err_t Display::ProcessContents()
     {
         if (itr->second.scrollData.isScrolling)
         {
-            // ESP_LOGI("Display", "Processing scrolling element advancing to %d", itr->second.scrollData.scrollPosition);
             Bounds b = itr->second.bounds;
             std::string content = itr->second.GetContent();
+            // ESP_LOGI("Display", "Processing scrolling element advancing to %d", itr->second.scrollData.scrollPosition);
             if (itr->second.scrollData.scrollPosition + 1 <= (content.length() - (b.endColumn - b.startColumn)))
             {
                 itr->second.scrollData.scrollPosition++;
@@ -121,12 +140,27 @@ esp_err_t Display::ProcessContents()
             {
                 itr->second.scrollData.scrollPosition = 0;
             }
-
-            _lcd->moveCursor(b.startRow, b.startColumn);
-            std::string toWrite = content.substr(itr->second.scrollData.scrollPosition, (b.endColumn - b.startColumn));
-            // ESP_LOGD(DISPLAY_TAG, "Will write %s to %d,%d", toWrite.c_str(), b.startRow, b.startColumn);
-            _lcd->write(toWrite);
+            // write to screen only if segments layer is active
+            if (itr->second.layerNumber == _activelayer)
+            {
+                _lcd->moveCursor(b.startRow, b.startColumn);
+                std::string toWrite = content.substr(itr->second.scrollData.scrollPosition, (b.endColumn - b.startColumn));
+                // ESP_LOGD(DISPLAY_TAG, "Will write %s to %d,%d", toWrite.c_str(), b.startRow, b.startColumn);
+                _lcd->write(toWrite);
+            }
         }
+    }
+    // countdown on temporary layer
+    if (_nonDefaultLayerTTL > 0)
+    {
+        ESP_LOGE("Display", "DEcresing ttl to %d", _nonDefaultLayerTTL);
+        _nonDefaultLayerTTL--;
+    }
+    // switch back to default layer when times up
+    if (_activelayer != 0 && _nonDefaultLayerTTL == 0)
+    {
+        ESP_LOGE("Display", "Reverting to layer 0");
+        _activelayer = 0;
     }
 
     return ESP_OK;

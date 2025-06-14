@@ -100,13 +100,14 @@ namespace ArduinoJson
             dst["mosipin"] = (uint8_t)src.mosipin;
             dst["misopin"] = (uint8_t)src.misopin;
             dst["sclkpin"] = (uint8_t)src.sclkpin;
+            dst["startvolume"] = (uint8_t)src.startvolume;
 
             return true;
         }
 
         static Vs1053Settings fromJson(JsonVariantConst src)
         {
-            return Vs1053Settings(src["dreqpin"], src["xcspin"], src["xdcspin"], src["reset"], src["mosipin"], src["misopin"], src["sclkpin"]);
+            return Vs1053Settings(src["dreqpin"], src["xcspin"], src["xdcspin"], src["reset"], src["mosipin"], src["misopin"], src["sclkpin"], src["startvolume"]);
         }
 
         static bool checkJson(JsonVariantConst src)
@@ -117,7 +118,8 @@ namespace ArduinoJson
                    src["resetpin"].is<uint8_t>() &&
                    src["mosipin"].is<uint8_t>() &&
                    src["misopin"].is<uint8_t>() &&
-                   src["sclkpin"].is<uint8_t>();
+                   src["sclkpin"].is<uint8_t>() &&
+                   src["startvolume"].is<uint8_t>();
         }
     };
 

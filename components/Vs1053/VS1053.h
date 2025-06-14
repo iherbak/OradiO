@@ -41,8 +41,6 @@
 #define VS1053_CHUNK_SIZE 32
 #define _BV(bit) (1 << (bit))
 
-#define CONFIG_VOLUME 80
-
 class VS1053
 {
 

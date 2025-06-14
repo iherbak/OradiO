@@ -12,7 +12,8 @@
         "resetpin": -1,
         "mosipin": 23,
         "misopin": 19,
-        "sclkpin": 18
+        "sclkpin": 18,
+        "startvolume": 85
     },
     "wifi":{
         "stassid":"",

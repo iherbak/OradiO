@@ -1,11 +1,11 @@
 {
     "C_Cpp.intelliSenseEngine": "default",
-    "idf.espIdfPathWin": "C:\\Users\\A0vy\\esp\\v5.4\\esp-idf",
+    "idf.espIdfPathWin": "C:\\Users\\A0vy\\esp\\v5.4.1\\esp-idf",
     "idf.openOcdConfigs": [
         "interface/ftdi/esp32_devkitj_v1.cfg",
         "target/esp32.cfg"
     ],
-    "idf.portWin": "COM3",
+    "idf.portWin": "COM4",
     "idf.toolsPathWin": "C:\\Users\\A0vy\\.espressif",
     "idf.flashType": "UART",
     "files.associations": {
@@ -103,5 +103,6 @@
         "syncstream": "cpp",
         "typeindex": "cpp",
         "valarray": "cpp"
-    }
+    },
+    "idf.pythonInstallPath": "C:\\Users\\A0vy\\.espressif\\tools\\idf-python\\3.11.2\\python.exe"
 }

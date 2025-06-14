@@ -91,6 +91,7 @@ export class Vs1053Settings {
     mosipin: number;
     misopin: number;
     sclkpin: number;
+    startvolume: number;
 }
 
 export class WifiSettings {
@@ -123,6 +124,7 @@ export enum SettingsField {
     resetpin,
     mosipin,
     misopin,
-    sclkpin
+    sclkpin,
+    startvolume
 }
 

@@ -22,6 +22,7 @@
 #include "main.h"
 #include "oconfig.h"
 #include "./models/vs1503Command.h"
+#include "./models/displayCommand.h"
 
 #define TASK_ARRAY_START_NOTFIY 0
 #define TASK_ARRAY_BITRATE_NOTIFY 1
@@ -37,7 +38,8 @@ TaskHandle_t streamingTaskHandle = NULL;
 TaskHandle_t fetcherTaskHandle = NULL;
 
 QueueHandle_t stationQueue;
-QueueHandle_t commandQueue;
+QueueHandle_t vs1053commandQueue;
+QueueHandle_t displaycommandQueue;
 
 OServer oServer;
 Display *display;
@@ -48,7 +50,7 @@ OSettings oSettings;
 int lastStation = 0;
 int metaBitrate = 192;
 int metaInt = 0;
-int volume = CONFIG_VOLUME;
+int volume = 0;
 bool mainReset = false;
 
 uint8_t prevStationButton = 0;
@@ -65,6 +67,7 @@ void buttonHandler(void *arg)
     uint8_t *buttonNum = (uint8_t *)arg;
     uint8_t b = *buttonNum;
     Vs1053Commands volumeCommand;
+    DisplayCommands dspCommand = SHOWVOLUME;
     switch (b)
     {
     case 0:
@@ -87,20 +90,17 @@ void buttonHandler(void *arg)
     }
     case 2:
     {
-        if (volume - 1 > 0)
-        {
-            volumeCommand = VOLUMEDOWN;
-            xQueueSendFromISR(commandQueue, &volumeCommand, NULL);
-        }
+        volumeCommand = VOLUMEDOWN;
+        xQueueSendFromISR(vs1053commandQueue, &volumeCommand, NULL);
+        xQueueSendFromISR(displaycommandQueue, &dspCommand, NULL);
         break;
     }
     case 3:
     {
-        if (volume + 1 < 100)
-        {
-            volumeCommand = VOLUMEUP;
-            xQueueSendFromISR(commandQueue, &volumeCommand, NULL);
-        }
+        volumeCommand = VOLUMEUP;
+        xQueueSendFromISR(vs1053commandQueue, &volumeCommand, NULL);
+        xQueueSendFromISR(displaycommandQueue, &dspCommand, NULL);
+
         break;
     }
     }
@@ -153,20 +153,27 @@ esp_err_t httpHandler(esp_http_client_event_t *event)
     return ESP_OK;
 }
 
-void executeCommand(Vs1053Commands command)
+void executeVs1053Command(Vs1053Commands command)
 {
     switch (command)
     {
     case VOLUMEDOWN:
     {
-        vs1503Device.setVolume(vs1503Device.getVolume() - 1);
-        volume--;
+        if (volume - 1 >= 0)
+        {
+            vs1503Device.setVolume(vs1503Device.getVolume() - 1);
+            volume--;
+        }
         break;
     }
     case VOLUMEUP:
     {
-        volume++;
-        vs1503Device.setVolume(vs1503Device.getVolume() + 1);
+        if (volume + 1 <= 100)
+        {
+
+            vs1503Device.setVolume(vs1503Device.getVolume() + 1);
+            volume++;
+        }
         break;
     }
     }
@@ -242,10 +249,10 @@ void streamingTask(void *param)
                     vs1503Device.playChunk(buffer, size);
                     vRingbufferReturnItem(ringBuffer, (void *)buffer);
                 }
-                if (xQueueReceive(commandQueue, &command, 0))
+                if (xQueueReceive(vs1053commandQueue, &command, 0))
                 {
                     // ESP_LOGI(taskName,"Executing command %d",command);
-                    executeCommand(command);
+                    executeVs1053Command(command);
                 }
                 if (pdPASS == xTaskNotifyWait(ULONG_MAX, pdFALSE, &notificationValue, 0))
                 {
@@ -394,7 +401,8 @@ void fetchTask(void *param)
                 }
                 else
                 {
-                    if(read <0){
+                    if (read < 0)
+                    {
                         retry = READ_MAX_RETRY;
                     }
                     // try five times than give up
@@ -637,19 +645,19 @@ void setVolume(bool up)
     Vs1053Commands volume;
     if (up)
     {
-        if (v < 100)
+        if (v <= 100)
         {
             volume = VOLUMEUP;
         }
     }
     else
     {
-        if (v > 0)
+        if (v >= 0)
         {
             volume = VOLUMEDOWN;
         }
     }
-    xQueueSend(commandQueue, &volume, portMAX_DELAY);
+    xQueueSend(vs1053commandQueue, &volume, NULL);
 };
 
 void wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -746,14 +754,16 @@ void mainTask(void *param)
     xSemaphoreGive(ringbufferSemaphore);
     std::string message("");
     stationQueue = xQueueCreate(5, sizeof(int));
-    commandQueue = xQueueCreate(5, sizeof(Vs1053Commands));
+    vs1053commandQueue = xQueueCreate(5, sizeof(Vs1053Commands));
+    displaycommandQueue = xQueueCreate(5, sizeof(DisplayCommands));
     uint32_t notificationValue;
     // Display_init
     Display dsp(oSettings.display.sdapin, oSettings.display.sclpin, oSettings.display.rows, oSettings.display.cols);
     display = &dsp;
     display->AddHUNChars();
-    ESP_ERROR_CHECK(display->AddSegment(DisplaySegment(0, Bounds(0, 0, oSettings.display.cols, 0))));
-    ESP_ERROR_CHECK(display->AddSegment(DisplaySegment(1, Bounds(1, 0, oSettings.display.cols, 1))));
+    ESP_ERROR_CHECK(display->AddSegment(DisplaySegment(0, 0, Bounds(0, 0, oSettings.display.cols, 0))));
+    ESP_ERROR_CHECK(display->AddSegment(DisplaySegment(1, 0, Bounds(1, 0, oSettings.display.cols, 1))));
+    ESP_ERROR_CHECK(display->AddSegment(DisplaySegment(3, 1, Bounds(1, 0, oSettings.display.cols, 1))));
     message = "Display on..";
     display->SetContent(0, message);
     message = "ORadio is starting...";
@@ -840,6 +850,7 @@ void mainTask(void *param)
             case TASK_ARRAY_WIFI_CONNECTED:
             {
                 running = true;
+                DisplayCommands command;
                 while (running)
                 {
                     if (xQueueReceive(stationQueue, &lastStation, 100 / portTICK_PERIOD_MS))
@@ -859,6 +870,15 @@ void mainTask(void *param)
 
                         xTaskNotify(fetcherTaskHandle, TASK_ARRAY_START_NOTFIY, eSetValueWithoutOverwrite);
                     }
+                    if (xQueueReceive(displaycommandQueue, &command, 100 / portTICK_PERIOD_MS))
+                    {
+                        while (xQueueReceive(displaycommandQueue, &command, 500 / portTICK_PERIOD_MS))
+                            ;
+                        // ESP_LOGI(taskName,"Executing command %d",command);
+                        message = "Volume: ";
+                        message += std::to_string(volume);
+                        display->SetContent(3, message);
+                    }
                     display->ProcessContents();
                     // at this point we will could get not connected only
                     if (pdPASS == xTaskNotifyWait(ULONG_MAX, pdFALSE, &notificationValue, 0))
@@ -872,6 +892,7 @@ void mainTask(void *param)
                         case TASK_ARRAY_WIFI_NOT_CONNECTED:
                         {
                             running = false;
+                            break;
                         }
                         }
                     }
@@ -926,9 +947,9 @@ extern "C" void app_main(void)
     vs1503Device.switchToMp3Mode();
     vs1503Device.loadDefaultVs1053Patches();
     vs1503Device.streamMode(false);
-    ESP_LOGI(taskName, "CONFIG_VOLUME=%d", CONFIG_VOLUME);
-    vs1503Device.setVolume(CONFIG_VOLUME);
-
+    ESP_LOGI(taskName, "CONFIG_VOLUME=%d", oSettings.vs1053.startvolume);
+    vs1503Device.setVolume(oSettings.vs1053.startvolume);
+    volume = oSettings.vs1053.startvolume;
     ringBuffer = xRingbufferCreate(RING_BUFFER_SIZE, RINGBUF_TYPE_BYTEBUF);
     assert(ringBuffer);
     // isr for buttons
@@ -944,7 +965,7 @@ extern "C" void app_main(void)
     xTaskCreatePinnedToCore(fetchTask, "Fetcher", 4096, NULL, 2, &fetcherTaskHandle, 0);
     configASSERT(fetcherTaskHandle);
     // streaming thread
-    xTaskCreatePinnedToCore(streamingTask, "Streaming", 2048, NULL, 2, &streamingTaskHandle, 1);
+    xTaskCreatePinnedToCore(streamingTask, "Streaming", 3072, NULL, 2, &streamingTaskHandle, 1);
     configASSERT(streamingTaskHandle);
     ESP_LOGI("app_main", "Oradio started");
     heap_caps_print_heap_info(MALLOC_CAP_INTERNAL);

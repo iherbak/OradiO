@@ -73,6 +73,9 @@ class Settings extends Component<any, any> {
         params.vs1053.sclkpin = event.target.value;
         break;
       }
+      case SettingsField.startvolume:{
+        params.vs1053.startvolume = event.target.value;
+      }
     }
     this.props.setSettings(params)
   }
@@ -144,6 +147,7 @@ class Settings extends Component<any, any> {
               <span>MOSI pin</span><input type="number" value={this.props.settings?.vs1053?.mosipin} onChange={(event) => this.updatesettings(event, SettingsField.mosipin)}></input>
               <span>MISO pin</span><input type="number" value={this.props.settings?.vs1053?.misopin} onChange={(event) => this.updatesettings(event, SettingsField.misopin)}></input>
               <span>SCLK pin</span><input type="number" value={this.props.settings?.vs1053?.sclkpin} onChange={(event) => this.updatesettings(event, SettingsField.sclkpin)}></input>
+              <span>Startup volume</span><input type="number" value={this.props.settings?.vs1053?.startvolume} onChange={(event) => this.updatesettings(event, SettingsField.startvolume)}></input>
             </div>
           </div>
 
